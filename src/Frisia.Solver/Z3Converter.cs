@@ -93,11 +93,8 @@ namespace Frisia.Solver
 
         internal Expr ToExpr(SyntaxNode node)
         {
-            var nodeType = node.GetType();
-            if (nodeType == typeof(IdentifierNameSyntax))
+            if (node is IdentifierNameSyntax identifierName)
             {
-                // Get type of identifier
-                var identifierName = (IdentifierNameSyntax)node;
                 try
                 {
                     var parameter = parameters.Single(x => x.Identifier.ValueText == identifierName.Identifier.ValueText);
@@ -109,9 +106,8 @@ namespace Frisia.Solver
                     throw new NotSupportedException(identifierName.Identifier.Text + " is not supported.");
                 }
             }
-            if (nodeType == typeof(LiteralExpressionSyntax))
+            if (node is LiteralExpressionSyntax literalExpression)
             {
-                var literalExpression = (LiteralExpressionSyntax)node;
                 switch (literalExpression.Kind())
                 {
                     case SK.NumericLiteralExpression:
@@ -124,21 +120,18 @@ namespace Frisia.Solver
                         throw new NotImplementedException(literalExpression.Kind().ToString());
                 }
             }
-            if (nodeType == typeof(ArrayTypeSyntax))
+            if (node is ArrayTypeSyntax arrayType)
             {
-                var array = (ArrayTypeSyntax)node;
-
-                switch (array.ElementType.ToString())
+                switch (arrayType.ElementType.ToString())
                 {
                     case "string":
                         return ctx.MkConstArray(ctx.StringSort, ctx.MkString(""));
                     default:
-                        throw new NotImplementedException(array.ElementType + "[]");
+                        throw new NotImplementedException(arrayType.ElementType + "[]");
                 }
             }
-            if (nodeType == typeof(BinaryExpressionSyntax))
+            if (node is BinaryExpressionSyntax binaryExpression)
             {
-                var binaryExpression = (BinaryExpressionSyntax)node;
                 var children = binaryExpression.ChildNodes().ToArray();
                 var left = ToExpr(children[0]);
                 var right = ToExpr(children[1]);
@@ -181,24 +174,19 @@ namespace Frisia.Solver
                     throw new NotSupportedException(node.GetType().Name + " is not supported.");
                 }
             }
-            if (nodeType == typeof(ParenthesizedExpressionSyntax))
+            if (node is ParenthesizedExpressionSyntax parenthesizedExpression)
             {
-                var parenthesizedExpression = (ParenthesizedExpressionSyntax)node;
                 return ToExpr(parenthesizedExpression.ChildNodes().Single());
             }
-            if (nodeType == typeof(InvocationExpressionSyntax))
-            {
-                var invocationExpression = (InvocationExpressionSyntax)node;
-                
+            if (node is InvocationExpressionSyntax invocationExpression)
+            {                
                 throw new NotSupportedException(node.GetType().Name + " is not supported.");
             }
-            if (nodeType == typeof(MemberAccessExpressionSyntax))
+            if (node is MemberAccessExpressionSyntax memberAccessExpression)
             {
-                var memberAccessExpression = (MemberAccessExpressionSyntax)node;
                 var children = memberAccessExpression.ChildNodes().ToArray();
-                if (children[0].GetType() == typeof(PredefinedTypeSyntax))
+                if (children[0] is PredefinedTypeSyntax predefinedType)
                 {
-                    var predefinedType = (PredefinedTypeSyntax)children[0];
                     switch (children[1].ToFullString().Trim())
                     {
                         case "MaxValue":
@@ -225,25 +213,20 @@ namespace Frisia.Solver
                 }
                 throw new NotImplementedException(node.GetType().Name);
             }
-            if (nodeType == typeof(CastExpressionSyntax))
+            if (node is CastExpressionSyntax castExpression)
             {
-                var castExpression = (CastExpressionSyntax)node;
-                if (castExpression.Expression.GetType() == typeof(IdentifierNameSyntax))
+                if (castExpression.Expression is IdentifierNameSyntax identifierName_1)
                 {
-                    var identifierName = (IdentifierNameSyntax)castExpression.Expression;
-                    return ToExpr(identifierName.Identifier, castExpression.Type);
+                    return ToExpr(identifierName_1.Identifier, castExpression.Type);
                 }
-                if (castExpression.Expression.GetType() == typeof(BinaryExpressionSyntax))
+                if (castExpression.Expression is BinaryExpressionSyntax binaryExpression_1)
                 {
-                    var binaryExpression = (BinaryExpressionSyntax)castExpression.Expression;
-                    return ToExpr(binaryExpression);
+                    return ToExpr(binaryExpression_1);
                 }
                 throw new NotImplementedException(node.GetType().Name);
             }
-            if (nodeType == typeof(PrefixUnaryExpressionSyntax))
+            if (node is PrefixUnaryExpressionSyntax prefixUnaryExpression)
             {
-                var prefixUnaryExpression = (PrefixUnaryExpressionSyntax)node;
-
                 var expression = ToExpr(prefixUnaryExpression.Operand);
                 return ctx.MkUnaryMinus((ArithExpr)expression);
             }

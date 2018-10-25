@@ -27,20 +27,13 @@ namespace Frisia.Solver
                 return new string[parameters.Count];
             }
 
-            try
+            using (var ctx = new Context(new Dictionary<string, string> { { "model", "true" } }))
             {
-                using (var ctx = new Context(new Dictionary<string, string> { { "model", "true" } }))
-                {
-                    var paramsSet = GetParamsSet(ctx, parameters);
+                var paramsSet = GetParamsSet(ctx, parameters);
 
-                    var branch = GetBranch(ctx, parameters, conditions);
-                    
-                    return ResolveBranch(ctx, branch, paramsSet);
-                }
-            }
-            catch (Exception ex)
-            {
-                throw;
+                var branch = GetBranch(ctx, parameters, conditions);
+
+                return ResolveBranch(ctx, branch, paramsSet);
             }
         }
 
@@ -117,7 +110,7 @@ namespace Frisia.Solver
                 case Status.SATISFIABLE:
                     return solver.Model;
                 default:
-                    throw new Exception("Unknown satisfiability.");
+                    throw new Z3Exception("Unknown satisfiability.");
             }
         }
     }
