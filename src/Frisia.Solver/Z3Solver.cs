@@ -80,16 +80,17 @@ namespace Frisia.Solver
         {
             var result = new string[paramsSet.Length];
 
-            var model = Solve(ctx, branch);
-
-            if (model != null)
+            using (var model = Solve(ctx, branch))
             {
-                for (int i = 0; i < paramsSet.Length; i++)
+                if (model != null)
                 {
-                    result[i] = model.Evaluate(paramsSet[i]).ToString();
-                }
+                    for (int i = 0; i < paramsSet.Length; i++)
+                    {
+                        result[i] = model.Evaluate(paramsSet[i]).ToString();
+                    }
 
-                return result;
+                    return result;
+                }
             }
 
             return null;
@@ -97,16 +98,18 @@ namespace Frisia.Solver
 
         private Model Solve(Context ctx, BoolExpr constraints)
         {
-            var solver = ctx.MkSolver();
-            solver.Assert(constraints);
-            switch (solver.Check())
+            using (var solver = ctx.MkSolver())
             {
-                case Status.UNSATISFIABLE:
-                    return null;
-                case Status.SATISFIABLE:
-                    return solver.Model;
-                default:
-                    throw new Z3Exception("Unknown satisfiability.");
+                solver.Assert(constraints);
+                switch (solver.Check())
+                {
+                    case Status.UNSATISFIABLE:
+                        return null;
+                    case Status.SATISFIABLE:
+                        return solver.Model;
+                    default:
+                        throw new Z3Exception("Unknown satisfiability.");
+                }
             }
         }
     }
