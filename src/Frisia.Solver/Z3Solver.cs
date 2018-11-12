@@ -31,9 +31,10 @@ namespace Frisia.Solver
             {
                 var paramsSet = GetParamsSet(ctx, parameters);
 
-                var branch = GetBranch(ctx, parameters, conditions);
-
-                return ResolveBranch(ctx, branch, paramsSet);
+                using (var branch = GetBranch(ctx, parameters, conditions))
+                {
+                    return ResolveBranch(ctx, branch, paramsSet);
+                }                
             }
         }
 
@@ -62,8 +63,10 @@ namespace Frisia.Solver
                 {
                     try
                     {
-                        var constraint = (BoolExpr)convert.ToExpr(conditions[i]);
-                        branch = ctx.MkAnd(constraint, branch);
+                        using (var constraint = (BoolExpr)convert.ToExpr(conditions[i]))
+                        {
+                            branch = ctx.MkAnd(constraint, branch);
+                        }                        
                     }
                     catch (NotSupportedException)
                     {
@@ -86,7 +89,18 @@ namespace Frisia.Solver
                 {
                     for (int i = 0; i < paramsSet.Length; i++)
                     {
-                        result[i] = model.Evaluate(paramsSet[i]).ToString();
+                        using (var expr = model.Evaluate(paramsSet[i]))
+                        {
+                            // If parameter is not evaluated in the model, set default value
+                            if (paramsSet[i] == expr)
+                            {
+                                result[i] = GetDefaultValue(expr).ToString();
+                            }
+                            else
+                            {
+                                result[i] = expr.ToString();
+                            }
+                        }                        
                     }
 
                     return result;
@@ -111,6 +125,13 @@ namespace Frisia.Solver
                         throw new Z3Exception("Unknown satisfiability.");
                 }
             }
+        }
+
+        private object GetDefaultValue(Expr expr)
+        {
+            if (expr.IsInt) return default(int);
+            if (expr.IsBool) return default(bool);
+            throw new Z3Exception("Unsupported type.");
         }
     }
 }
