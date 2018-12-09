@@ -59,14 +59,18 @@ namespace Frisia.Solver
 
             using (var convert = new Z3Converter(ctx, parameters))
             {
+                var list = new List<BoolExpr>();
+                list.Add(branch);
                 for (int i = 0; i < conditions.Count; i++)
                 {
                     try
                     {
-                        using (var constraint = (BoolExpr)convert.ToExpr(conditions[i]))
-                        {
+                        var constraint = (BoolExpr)convert.ToExpr(conditions[i]);
+                        
+                            list.Add(constraint);
+                            Console.WriteLine(branch.ToString());
                             branch = ctx.MkAnd(constraint, branch);
-                        }                        
+                                              
                     }
                     catch (NotSupportedException)
                     {
