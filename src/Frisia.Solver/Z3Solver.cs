@@ -30,11 +30,9 @@ namespace Frisia.Solver
             using (var ctx = new Context(new Dictionary<string, string> { { "model", "true" } }))
             {
                 var paramsSet = GetParamsSet(ctx, parameters);
+                var branch = GetBranch(ctx, parameters, conditions);
 
-                using (var branch = GetBranch(ctx, parameters, conditions))
-                {
-                    return ResolveBranch(ctx, branch, paramsSet);
-                }                
+                return ResolveBranch(ctx, branch, paramsSet);
             }
         }
 
@@ -53,29 +51,22 @@ namespace Frisia.Solver
             return paramsSet;
         }
 
-        private BoolExpr GetBranch(Context ctx, SeparatedSyntaxList<ParameterSyntax> parameters, IList<ExpressionSyntax> conditions)
+        private BoolExpr[] GetBranch(Context ctx, SeparatedSyntaxList<ParameterSyntax> parameters, IList<ExpressionSyntax> conditions)
         {
-            var branch = ctx.MkTrue();
+            var branch = new BoolExpr[conditions.Count];
 
             using (var convert = new Z3Converter(ctx, parameters))
             {
-                var list = new List<BoolExpr>();
-                list.Add(branch);
                 for (int i = 0; i < conditions.Count; i++)
                 {
                     try
                     {
-                        var constraint = (BoolExpr)convert.ToExpr(conditions[i]);
-                        
-                            list.Add(constraint);
-                            Console.WriteLine(branch.ToString());
-                            branch = ctx.MkAnd(constraint, branch);
-                                              
+                        branch[i] = (BoolExpr)convert.ToExpr(conditions[i]);
                     }
                     catch (NotSupportedException)
                     {
                         // If not supported, set as true
-                        branch = ctx.MkAnd(ctx.MkTrue(), branch);
+                        branch[i] = ctx.MkTrue();
                     }
                 }
             }
@@ -83,7 +74,7 @@ namespace Frisia.Solver
             return branch;
         }
         
-        private string[] ResolveBranch(Context ctx, BoolExpr branch, Expr[] paramsSet)
+        private string[] ResolveBranch(Context ctx, BoolExpr[] branch, Expr[] paramsSet)
         {
             var result = new string[paramsSet.Length];
 
@@ -114,7 +105,7 @@ namespace Frisia.Solver
             return null;
         }
 
-        private Model Solve(Context ctx, BoolExpr constraints)
+        private Model Solve(Context ctx, BoolExpr[] constraints)
         {
             using (var solver = ctx.MkSolver())
             {
