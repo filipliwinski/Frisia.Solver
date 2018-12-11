@@ -6,7 +6,12 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="2.9.0" />
-    <PackageReference Include="z3x64win" Version="4.5.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Microsoft.Z3">
+      <HintPath>..\..\..\..\..\..\z3\z3-4.8.4-x64-win\z3-4.8.4.2ca83d0095f3-x64-win\bin\Microsoft.Z3.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
 </Project>
