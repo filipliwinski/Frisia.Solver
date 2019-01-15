@@ -33,7 +33,7 @@ namespace Frisia.Solver
                 switch (expression.Kind())
                 {
                     case SK.IdentifierName:
-                        return (BoolExpr)ToExpr(expression);
+                        return ToExpr((SyntaxNode)expression);
                     case SK.NumericLiteralExpression:
                         var literalExpression = (LiteralExpressionSyntax)expression;
                         return ctx.MkInt((int)literalExpression.Token.Value);
@@ -176,7 +176,7 @@ namespace Frisia.Solver
             }
             if (node is ParenthesizedExpressionSyntax parenthesizedExpression)
             {
-                return ToExpr(parenthesizedExpression.ChildNodes().Single());
+                return ToExpr(parenthesizedExpression.Expression);
             }
             if (node is InvocationExpressionSyntax invocationExpression)
             {                

@@ -14,7 +14,7 @@
 
   <ItemGroup>
     <Reference Include="Microsoft.Z3">
-      <HintPath>..\..\lib\Microsoft.Z3.dll</HintPath>
+      <HintPath>..\..\..\..\..\..\z3\z3-4.5.0-x64-win\z3-4.5.0-x64-win\bin\Microsoft.Z3.dll</HintPath>
     </Reference>
   </ItemGroup>
 
