@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Z3;
 using System;
 using System.Linq;
-using SK = Microsoft.CodeAnalysis.CSharp.SyntaxKind;
+using static Microsoft.CodeAnalysis.CSharp.SyntaxKind;
 
 namespace Frisia.Solver
 {
@@ -24,211 +24,171 @@ namespace Frisia.Solver
             return ToExpr(parameter.Identifier, parameter.Type);
         }
 
-        internal Expr ToExpr(ExpressionSyntax expression)
+        internal Expr ToExpr(SyntaxNode node)
         {
-            var children = expression.ChildNodes().ToArray();
-
-            if (children.Length == 0)
+            switch (node)
             {
-                switch (expression.Kind())
-                {
-                    case SK.IdentifierName:
-                        return ToExpr((SyntaxNode)expression);
-                    case SK.NumericLiteralExpression:
-                        var literalExpression = (LiteralExpressionSyntax)expression;
-                        return ctx.MkInt((int)literalExpression.Token.Value);
-                    default:
-                        throw new NotImplementedException(expression.Kind().ToString());
-                }
-            }
-            else
-            {
-                var left = ToExpr(children[0]);
-                if (children.Length == 1)
-                {
-                    switch (expression.Kind())
-                    {
-                        case SK.LogicalNotExpression:
-                            return ctx.MkNot((BoolExpr)left);
-                        default:
-                            throw new NotImplementedException(expression.Kind().ToString());
-                    }
-                }
-                else
-                {
-                    if (expression.IsKind(SK.InvocationExpression))
-                    {
-                        throw new NotSupportedException("InvocationExpression is not supported.");
-                    }
-
-                    var right = ToExpr(children[1]);
-
-                    try
-                    {
-                        switch (expression.Kind())
-                        {
-                            case SK.GreaterThanExpression:
-                                return ctx.MkGt((ArithExpr)left, (ArithExpr)right);
-                            case SK.LessThanExpression:
-                                return ctx.MkLt((ArithExpr)left, (ArithExpr)right);
-                            case SK.GreaterThanOrEqualExpression:
-                                return ctx.MkGe((ArithExpr)left, (ArithExpr)right);
-                            case SK.LessThanOrEqualExpression:
-                                return ctx.MkLe((ArithExpr)left, (ArithExpr)right);
-                            case SK.EqualsExpression:
-                                return ctx.MkEq(left, right);
-                            case SK.NotEqualsExpression:
-                                return ctx.MkNot(ctx.MkEq(left, right));
-                            default:
-                                throw new NotImplementedException(expression.Kind().ToString());
-                        }
-                    }
-                    catch (InvalidCastException)
-                    {
-                        throw new NotSupportedException("Given expression is not supported.");
-                    }
-                }
+                case ArrayTypeSyntax arrayType:
+                    return ToExpr(arrayType);
+                case BinaryExpressionSyntax binaryExpression:
+                    return ToExpr(binaryExpression);
+                case CastExpressionSyntax castExpression:
+                    return ToExpr(castExpression);
+                case IdentifierNameSyntax identifierName:
+                    return ToExpr(identifierName);
+                case InvocationExpressionSyntax invocationExpression:
+                    return ToExpr(invocationExpression);
+                case LiteralExpressionSyntax literalExpression:
+                    return ToExpr(literalExpression);
+                case MemberAccessExpressionSyntax memberAccessExpression:
+                    return ToExpr(memberAccessExpression);
+                case ParenthesizedExpressionSyntax parenthesizedExpression:
+                    return ToExpr(parenthesizedExpression.Expression);
+                case PrefixUnaryExpressionSyntax prefixUnaryExpression:
+                    return ToExpr(prefixUnaryExpression);
+                default:
+                    throw new NotImplementedException(node.GetType().Name);
             }
         }
 
-        internal Expr ToExpr(SyntaxNode node)
+        internal Expr ToExpr(InvocationExpressionSyntax node)
         {
-            if (node is IdentifierNameSyntax identifierName)
-            {
-                try
-                {
-                    var parameter = parameters.Single(x => x.Identifier.ValueText == identifierName.Identifier.ValueText);
+            throw new NotSupportedException(node.GetType().Name + " is not supported.");
+        }
 
-                    return ToExpr(identifierName.Identifier, parameter.Type);
-                }
-                catch (InvalidOperationException)
-                {
-                    throw new NotSupportedException(identifierName.Identifier.Text + " is not supported.");
-                }
-            }
-            if (node is LiteralExpressionSyntax literalExpression)
+        internal Expr ToExpr(PrefixUnaryExpressionSyntax node)
+        {
+            var expression = ToExpr(node.Operand);
+
+            switch (node.Kind())
             {
-                switch (literalExpression.Kind())
+                case LogicalNotExpression:
+                    return ctx.MkNot((BoolExpr)expression);
+                case UnaryMinusExpression:
+                    return ctx.MkUnaryMinus((ArithExpr)expression);
+                default:
+                    throw new NotImplementedException(node.GetType().Name);
+            }
+        }
+
+        internal Expr ToExpr(CastExpressionSyntax node)
+        {
+            return ToExpr(node.Expression);
+        }
+
+        internal Expr ToExpr(ArrayTypeSyntax node)
+        {
+            switch (node.ElementType.ToString())
+            {
+                case "string":
+                    return ctx.MkConstArray(ctx.StringSort, ctx.MkString(""));
+                default:
+                    throw new NotImplementedException(node.ElementType + "[]");
+            }
+        }
+
+        internal Expr ToExpr(IdentifierNameSyntax node)
+        {
+            try
+            {
+                var parameter = parameters.Single(x => x.Identifier.ValueText == node.Identifier.ValueText);
+
+                return ToExpr(node.Identifier, parameter.Type);
+            }
+            catch (InvalidOperationException)
+            {
+                throw new NotSupportedException(node.Identifier.Text + " is not supported.");
+            }
+        }
+
+        internal Expr ToExpr(LiteralExpressionSyntax node)
+        {
+            switch (node.Kind())
+            {
+                case NumericLiteralExpression:
+                    return ctx.MkInt((int)node.Token.Value);
+                case TrueLiteralExpression:
+                    return ctx.MkTrue();
+                case FalseLiteralExpression:
+                    return ctx.MkFalse();
+                default:
+                    throw new NotImplementedException(node.Kind().ToString());
+            }
+        }
+
+        internal Expr ToExpr(BinaryExpressionSyntax node)
+        {
+            var children = node.ChildNodes().ToArray();
+            var left = ToExpr(children[0]);
+            var right = ToExpr(children[1]);
+            try
+            {
+                switch (node.Kind())
                 {
-                    case SK.NumericLiteralExpression:
-                        return ctx.MkInt((int)literalExpression.Token.Value);
-                    case SK.TrueLiteralExpression:
-                        return ctx.MkTrue();
-                    case SK.FalseLiteralExpression:
-                        return ctx.MkFalse();
+                    case AddExpression:
+                        return ctx.MkAdd((ArithExpr)left, (ArithExpr)right) as ArithExpr;
+                    case SubtractExpression:
+                        return ctx.MkSub((ArithExpr)left, (ArithExpr)right) as ArithExpr;
+                    case MultiplyExpression:
+                        return ctx.MkMul((ArithExpr)left, (ArithExpr)right) as ArithExpr;
+                    case DivideExpression:
+                        return ctx.MkDiv((ArithExpr)left, (ArithExpr)right) as ArithExpr;
+                    case ModuloExpression:
+                        return ctx.MkMod((IntExpr)left, (IntExpr)right) as IntExpr;
+                    case GreaterThanExpression:
+                        return ctx.MkGt((ArithExpr)left, (ArithExpr)right);
+                    case LessThanExpression:
+                        return ctx.MkLt((ArithExpr)left, (ArithExpr)right);
+                    case GreaterThanOrEqualExpression:
+                        return ctx.MkGe((ArithExpr)left, (ArithExpr)right);
+                    case LessThanOrEqualExpression:
+                        return ctx.MkLe((ArithExpr)left, (ArithExpr)right);
+                    case EqualsExpression:
+                        return ctx.MkEq(left, right);
+                    case NotEqualsExpression:
+                        return ctx.MkNot(ctx.MkEq(left, right));
+                    case LogicalAndExpression:
+                        return ctx.MkAnd(ctx.MkEq(left, right));
+                    case LogicalOrExpression:
+                        return ctx.MkOr(ctx.MkEq(left, right));
                     default:
-                        throw new NotImplementedException(literalExpression.Kind().ToString());
+                        throw new NotImplementedException(node.Kind().ToString());
                 }
             }
-            if (node is ArrayTypeSyntax arrayType)
+            catch (InvalidCastException)
             {
-                switch (arrayType.ElementType.ToString())
-                {
-                    case "string":
-                        return ctx.MkConstArray(ctx.StringSort, ctx.MkString(""));
-                    default:
-                        throw new NotImplementedException(arrayType.ElementType + "[]");
-                }
-            }
-            if (node is BinaryExpressionSyntax binaryExpression)
-            {
-                var children = binaryExpression.ChildNodes().ToArray();
-                var left = ToExpr(children[0]);
-                var right = ToExpr(children[1]);
-                try
-                {
-                    switch (binaryExpression.Kind())
-                    {
-                        case SK.AddExpression:
-                            return ctx.MkAdd((ArithExpr)left, (ArithExpr)right) as ArithExpr;
-                        case SK.SubtractExpression:
-                            return ctx.MkSub((ArithExpr)left, (ArithExpr)right) as ArithExpr;
-                        case SK.MultiplyExpression:
-                            return ctx.MkMul((ArithExpr)left, (ArithExpr)right) as ArithExpr;
-                        case SK.DivideExpression:
-                            return ctx.MkDiv((ArithExpr)left, (ArithExpr)right) as ArithExpr;
-                        case SK.ModuloExpression:
-                            return ctx.MkMod((IntExpr)left, (IntExpr)right) as IntExpr;
-                        case SK.GreaterThanExpression:
-                            return ctx.MkGt((ArithExpr)left, (ArithExpr)right);
-                        case SK.LessThanExpression:
-                            return ctx.MkLt((ArithExpr)left, (ArithExpr)right);
-                        case SK.GreaterThanOrEqualExpression:
-                            return ctx.MkGe((ArithExpr)left, (ArithExpr)right);
-                        case SK.LessThanOrEqualExpression:
-                            return ctx.MkLe((ArithExpr)left, (ArithExpr)right);
-                        case SK.EqualsExpression:
-                            return ctx.MkEq(left, right);
-                        case SK.NotEqualsExpression:
-                            return ctx.MkNot(ctx.MkEq(left, right));
-                        case SK.LogicalAndExpression:
-                            return ctx.MkAnd(ctx.MkEq(left, right));
-                        case SK.LogicalOrExpression:
-                            return ctx.MkOr(ctx.MkEq(left, right));
-                        default:
-                            throw new NotImplementedException(binaryExpression.Kind().ToString());
-                    }
-                }
-                catch (InvalidCastException)
-                {
-                    throw new NotSupportedException(node.GetType().Name + " is not supported.");
-                }
-            }
-            if (node is ParenthesizedExpressionSyntax parenthesizedExpression)
-            {
-                return ToExpr(parenthesizedExpression.Expression);
-            }
-            if (node is InvocationExpressionSyntax invocationExpression)
-            {                
                 throw new NotSupportedException(node.GetType().Name + " is not supported.");
             }
-            if (node is MemberAccessExpressionSyntax memberAccessExpression)
+        }
+
+        internal Expr ToExpr(MemberAccessExpressionSyntax node)
+        {
+            var children = node.ChildNodes().ToArray();
+            if (children[0] is PredefinedTypeSyntax predefinedType)
             {
-                var children = memberAccessExpression.ChildNodes().ToArray();
-                if (children[0] is PredefinedTypeSyntax predefinedType)
+                switch (children[1].ToFullString().Trim())
                 {
-                    switch (children[1].ToFullString().Trim())
-                    {
-                        case "MaxValue":
-                            switch (predefinedType.ToString())
-                            {
-                                case "int":
-                                    return ctx.MkInt(int.MaxValue);
-                                default:
-                                    break;
-                            }
-                            break;
-                        case "MinValue":
-                            switch (predefinedType.ToString())
-                            {
-                                case "int":
-                                    return ctx.MkInt(int.MinValue);
-                                default:
-                                    break;
-                            }
-                            break;
-                        default:
-                            throw new NotImplementedException(children[1].ToString());
-                    }
+                    case "MaxValue":
+                        switch (predefinedType.ToString())
+                        {
+                            case "int":
+                                return ctx.MkInt(int.MaxValue);
+                            default:
+                                break;
+                        }
+                        break;
+                    case "MinValue":
+                        switch (predefinedType.ToString())
+                        {
+                            case "int":
+                                return ctx.MkInt(int.MinValue);
+                            default:
+                                break;
+                        }
+                        break;
+                    default:
+                        throw new NotImplementedException(children[1].ToString());
                 }
-                throw new NotImplementedException(node.GetType().Name);
-            }
-            if (node is CastExpressionSyntax castExpression)
-            {
-                if (castExpression.Expression is IdentifierNameSyntax identifierName_1)
-                {
-                    return ToExpr(identifierName_1.Identifier, castExpression.Type);
-                }
-                if (castExpression.Expression is BinaryExpressionSyntax binaryExpression_1)
-                {
-                    return ToExpr(binaryExpression_1);
-                }
-                throw new NotImplementedException(node.GetType().Name);
-            }
-            if (node is PrefixUnaryExpressionSyntax prefixUnaryExpression)
-            {
-                var expression = ToExpr(prefixUnaryExpression.Operand);
-                return ctx.MkUnaryMinus((ArithExpr)expression);
             }
             throw new NotImplementedException(node.GetType().Name);
         }
