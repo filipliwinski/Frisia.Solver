@@ -106,7 +106,15 @@ namespace Frisia.Solver
             switch (node.Kind())
             {
                 case NumericLiteralExpression:
-                    return ctx.MkInt((int)node.Token.Value);
+                    if (node.Token.Value is byte)
+                        return ctx.MkInt((byte)node.Token.Value);
+                    if (node.Token.Value is short)
+                        return ctx.MkInt((short)node.Token.Value);
+                    if (node.Token.Value is int)
+                        return ctx.MkInt((int)node.Token.Value);
+                    if (node.Token.Value is long)
+                        return ctx.MkInt((long)node.Token.Value);
+                    throw new NotImplementedException(node.Kind().ToString());
                 case TrueLiteralExpression:
                     return ctx.MkTrue();
                 case FalseLiteralExpression:
@@ -171,21 +179,31 @@ namespace Frisia.Solver
                     case "MaxValue":
                         switch (predefinedType.ToString())
                         {
+                            case "byte":
+                                return ctx.MkInt(byte.MaxValue);
+                            case "short":
+                                return ctx.MkInt(short.MaxValue);
                             case "int":
                                 return ctx.MkInt(int.MaxValue);
+                            case "long":
+                                return ctx.MkInt(long.MaxValue);
                             default:
-                                break;
+                                throw new NotImplementedException(predefinedType.ToString());
                         }
-                        break;
                     case "MinValue":
                         switch (predefinedType.ToString())
                         {
+                            case "byte":
+                                return ctx.MkInt(byte.MinValue);
+                            case "short":
+                                return ctx.MkInt(short.MinValue);
                             case "int":
                                 return ctx.MkInt(int.MinValue);
+                            case "long":
+                                return ctx.MkInt(long.MinValue);
                             default:
-                                break;
+                                throw new NotImplementedException(predefinedType.ToString());
                         }
-                        break;
                     default:
                         throw new NotImplementedException(children[1].ToString());
                 }
@@ -199,6 +217,7 @@ namespace Frisia.Solver
             {
                 case "bool":
                     return ctx.MkBoolConst(identifier.Text);
+                case "byte":
                 case "short":
                 case "int":
                 case "long":

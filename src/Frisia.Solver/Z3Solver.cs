@@ -36,15 +36,15 @@ namespace Frisia.Solver
             }
         }
 
-        private Expr[] GetParamsSet(Context ctx, SeparatedSyntaxList<ParameterSyntax> parameters)
+        private ParamExpr[] GetParamsSet(Context ctx, SeparatedSyntaxList<ParameterSyntax> parameters)
         {
-            var paramsSet = new Expr[parameters.Count];
+            var paramsSet = new ParamExpr[parameters.Count];
 
             using (var convert = new Z3Converter(ctx, parameters))
             {
                 for (int i = 0; i < paramsSet.Length; i++)
                 {
-                    paramsSet[i] = convert.ToExpr(parameters[i]);
+                    paramsSet[i] = new ParamExpr(convert.ToExpr(parameters[i]), parameters[i].Type as PredefinedTypeSyntax);
                 }
             }
 
@@ -73,8 +73,8 @@ namespace Frisia.Solver
 
             return branch;
         }
-        
-        private string[] ResolveBranch(Context ctx, BoolExpr[] branch, Expr[] paramsSet)
+
+        private string[] ResolveBranch(Context ctx, BoolExpr[] branch, ParamExpr[] paramsSet)
         {
             var result = new string[paramsSet.Length];
 
@@ -84,10 +84,74 @@ namespace Frisia.Solver
                 {
                     for (int i = 0; i < paramsSet.Length; i++)
                     {
-                        using (var expr = model.Evaluate(paramsSet[i]))
+                        using (var expr = model.Evaluate(paramsSet[i].Expr))
                         {
                             // If parameter is not evaluated in the model, set default value
-                            if (paramsSet[i] == expr)
+                            if (paramsSet[i].Expr == expr)
+                            {
+                                result[i] = GetDefaultValue(expr).ToString();
+                            }
+                            else
+                            {
+                                result[i] = CheckBoundaries(expr, paramsSet[i].Type);
+                            }
+                        }
+                    }
+
+                    return result;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Resolves branch with boundaries constraints. Not used due to StackOverflow for samples.
+        /// </summary>
+        /// <param name="ctx"></param>
+        /// <param name="branch"></param>
+        /// <param name="paramsSet"></param>
+        /// <returns></returns>
+        private string[] ResolveBranchWithBoundaries(Context ctx, BoolExpr[] branch, ParamExpr[] paramsSet)
+        {
+            var result = new string[paramsSet.Length];
+
+            var count = 0;
+            var numParamsSet = new List<ParamExpr>();
+
+            foreach (var p in paramsSet)
+            {
+                if (p.Expr.IsInt)
+                {
+                    count++;
+                    numParamsSet.Add(p);
+                }
+            }
+
+            var extBranch = new BoolExpr[branch.Length + count * 2];
+
+            for (int i = 0; i < branch.Length; i++)
+            {
+                extBranch[i] = branch[i];
+            }
+
+            // Add min and max boundaries
+            for (int i = 0; i < count; i++)
+            {
+                extBranch[branch.Length + i * 2] = GetMinExpr(ctx, paramsSet[i]);
+                extBranch[branch.Length + i * 2 + 1] = GetMaxExpr(ctx, paramsSet[i]);
+            }
+
+            using (var model = Solve(ctx, extBranch))
+            {
+                if (model != null)
+                {
+                    for (int i = 0; i < paramsSet.Length; i++)
+                    {
+                        using (var expr = model.Evaluate(paramsSet[i].Expr))
+                        {
+                            // If parameter was not evaluated in the model, set default value
+                            if (paramsSet[i].Expr == expr)
                             {
                                 result[i] = GetDefaultValue(expr).ToString();
                             }
@@ -126,7 +190,95 @@ namespace Frisia.Solver
         {
             if (expr.IsInt) return default(int);
             if (expr.IsBool) return default(bool);
-            throw new Z3Exception("Unsupported type.");
+            throw new NotSupportedException("Unsupported type.");
+        }
+        
+        private BoolExpr GetMinExpr(Context ctx, ParamExpr expr)
+        {
+            if (expr.Expr.IsInt)
+            {
+                long value = 0;
+                switch (expr.Type.Keyword.Text)
+                {
+                    case "byte":
+                        value = byte.MinValue;
+                        break;
+                    case "short":
+                        value = short.MinValue;
+                        break;
+                    case "int":
+                        value = int.MinValue;
+                        break;
+                    case "long":
+                        value = long.MinValue;
+                        break;
+                    default:
+                        break;
+                }
+                return ctx.MkGe((ArithExpr)expr.Expr, ctx.MkInt(value));
+            }
+            throw new NotSupportedException("Unsupported type.");
+        }
+
+        private BoolExpr GetMaxExpr(Context ctx, ParamExpr expr)
+        {
+            long value = 0;
+            switch (expr.Type.Keyword.Text)
+            {
+                case "byte":
+                    value = byte.MaxValue;
+                    break;
+                case "short":
+                    value = short.MaxValue;
+                    break;
+                case "int":
+                    value = int.MaxValue;
+                    break;
+                case "long":
+                    value = long.MaxValue;
+                    break;
+                default:
+                    break;
+            }
+            return ctx.MkLe((ArithExpr)expr.Expr, ctx.MkInt(value));
+        }
+
+        private string CheckBoundaries(Expr expr, PredefinedTypeSyntax type)
+        {
+            if (expr.IsInt)
+            {
+                var value = Convert.ToInt64(expr.ToString());
+                switch (type.Keyword.Text)
+                {
+                    case "byte":
+                        if (value < byte.MinValue)
+                            return byte.MinValue.ToString();
+                        if (value > byte.MaxValue)
+                            return byte.MaxValue.ToString();
+                        break;
+                    case "short":
+                        if (value < short.MinValue)
+                            return short.MinValue.ToString();
+                        if (value > short.MaxValue)
+                            return short.MaxValue.ToString();
+                        break;
+                    case "int":
+                        if (value < int.MinValue)
+                            return int.MinValue.ToString();
+                        if (value > int.MaxValue)
+                            return int.MaxValue.ToString();
+                        break;
+                    case "long":
+                        if (value < long.MinValue)
+                            return long.MinValue.ToString();
+                        if (value > long.MaxValue)
+                            return long.MaxValue.ToString();
+                        break;
+                    default:
+                        break;
+                }
+            }
+            return expr.ToString();
         }
     }
 }
